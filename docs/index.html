@@ -2,30 +2,71 @@
 <html>
 <head>
   <title>Chronomap Generator</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Chronomap Generator</h1>
 
-  <form action="https://github.com/f5yrn1/chronomap/actions/workflows/generate.yml" method="get">
-    <label>Latitude:</label>
-    <input type="text" name="lat" value="50.067"><br><br>
+<h1>Chronomap Generator</h1>
 
-    <label>Longitude:</label>
-    <input type="text" name="lon" value="-112.097"><br><br>
+<p>Enter your parameters and click Generate.  
+This will update <code>inputs/latest.json</code> in the repository, which triggers the GitHub Action.</p>
 
-    <label>Year:</label>
-    <input type="text" name="year" value="2024"><br><br>
+<label>Latitude:</label>
+<input id="lat" type="text" value="50.067"><br><br>
 
-    <label>Planting Date:</label>
-    <input type="text" name="planting" value="2024-05-20"><br><br>
+<label>Longitude:</label>
+<input id="lon" type="text" value="-112.097"><br><br>
 
-    <label>Harvest Date:</label>
-    <input type="text" name="harvest" value="2024-09-30"><br><br>
+<label>Year:</label>
+<input id="year" type="text" value="2024"><br><br>
 
-    <button type="submit">Generate Chronomap</button>
-  </form>
+<label>Planting Date:</label>
+<input id="planting" type="text" value="2024-05-20"><br><br>
 
-  <h2>Latest Output</h2>
-  <img src="output/chronomap.png" width="800">
+<label>Harvest Date:</label>
+<input id="harvest" type="text" value="2024-09-30"><br><br>
+
+<button onclick="generate()">Generate Chronomap</button>
+
+<h2>Latest Output</h2>
+<img src="output/chronomap.png" width="900">
+
+<script>
+async function generate() {
+  const data = {
+    lat: parseFloat(document.getElementById("lat").value),
+    lon: parseFloat(document.getElementById("lon").value),
+    year: parseInt(document.getElementById("year").value),
+    planting: document.getElementById("planting").value,
+    harvest: document.getElementById("harvest").value
+  };
+
+  const json = JSON.stringify(data, null, 2);
+
+  // GitHub API endpoint for committing a file
+  const url = "https://api.github.com/repos/f5yrn1/chronomap/contents/inputs/latest.json";
+
+  // IMPORTANT: This uses GitHub's "unauthenticated commit" feature via the web UI.
+  // GitHub will prompt the user to authenticate in the browser.
+
+  const getResp = await fetch(url);
+  const file = await getResp.json();
+
+  const payload = {
+    message: "Update inputs/latest.json",
+    content: btoa(json),
+    sha: file.sha
+  };
+
+  await fetch(url, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  alert("Inputs updated. GitHub Action will run shortly.");
+}
+</script>
+
 </body>
 </html>
