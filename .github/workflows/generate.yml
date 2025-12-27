@@ -1,0 +1,54 @@
+name: Generate Chronomap
+
+on:
+  workflow_dispatch:
+    inputs:
+      lat:
+        description: "Latitude"
+        required: true
+      lon:
+        description: "Longitude"
+        required: true
+      year:
+        description: "Year"
+        required: true
+      planting:
+        description: "Planting date"
+        required: true
+      harvest:
+        description: "Harvest date"
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+
+    - name: Install dependencies
+      run: |
+        pip install cdsapi xarray netCDF4 pandas numpy pytz timezonefinder astral matplotlib
+
+    - name: Run chronomap generator
+      run: |
+        python scripts/chronomap.py \
+          --lat ${{ github.event.inputs.lat }} \
+          --lon ${{ github.event.inputs.lon }} \
+          --year ${{ github.event.inputs.year }} \
+          --planting ${{ github.event.inputs.planting }} \
+          --harvest ${{ github.event.inputs.harvest }} \
+          --out docs/output/chronomap.png
+
+    - name: Commit results
+      run: |
+        git config user.name "github-actions"
+        git config user.email "actions@github.com"
+        git add docs/output/chronomap.png
+        git commit -m "Updated chronomap"
+        git push
