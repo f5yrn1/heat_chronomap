@@ -1,8 +1,8 @@
 """
-chronomap.py
+chronomap.py — AgERA5-H version
 
 Full Python chronomap engine with:
-- ERA5 hourly 2m temperature (cdsapi)
+- AgERA5-H hourly 2m temperature (public, no credentials)
 - Local time conversion
 - GDD-based phenology (with "tuber initiation")
 - Photoperiod-aware thermal envelopes
@@ -11,14 +11,13 @@ Full Python chronomap engine with:
 - Hour x DOY climate-risk tiles
 
 Dependencies:
-pip install cdsapi xarray netCDF4 pandas numpy pytz timezonefinder astral matplotlib
+pip install xarray netCDF4 pandas numpy pytz timezonefinder astral matplotlib
 """
 
 import os
 from dataclasses import dataclass
 from typing import Dict, Tuple
 
-import cdsapi
 import xarray as xr
 import numpy as np
 import pandas as pd
@@ -34,37 +33,24 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
 
 
 # ---------------------------------------------------------------------
-# 1. ERA5 retrieval
+# 1. AgERA5-H hourly temperature loader
 # ---------------------------------------------------------------------
 
-def get_era5_temperature(lat: float, lon: float, year: int, out_nc: str = "era5_t2m.nc") -> pd.DataFrame:
+def load_agera5_hourly(lat: float, lon: float, year: int) -> pd.DataFrame:
     """
-    Download ERA5 hourly 2 m temperature for a given year and location,
-    extract nearest grid cell, and return a DataFrame with UTC timestamps and temp (°C).
+    Load AgERA5-H hourly 2m temperature for a single point.
+    Public, no credentials required.
     """
-    c = cdsapi.Client()
 
-    area = [lat + 0.25, lon - 0.25, lat - 0.25, lon + 0.25]
+    # Public AgERA5-H bucket (example structure)
+    url = f"https://objectstore.eea.europa.eu/agera5/t2m_hourly/{year}.nc"
 
-    if not os.path.exists(out_nc):
-        c.retrieve(
-            "reanalysis-era5-single-levels",
-            {
-                "product_type": "reanalysis",
-                "variable": ["2m_temperature"],
-                "year": str(year),
-                "month": [f"{m:02d}" for m in range(1, 13)],
-                "day": [f"{d:02d}" for d in range(1, 32)],
-                "time": [f"{h:02d}:00" for h in range(24)],
-                "format": "netcdf",
-                "area": area,
-            },
-            out_nc,
-        )
+    ds = xr.open_dataset(url)
 
-    ds = xr.open_dataset(out_nc)
+    # Select nearest grid cell
     ds_point = ds.sel(latitude=lat, longitude=lon, method="nearest")
 
+    # Convert to Celsius
     temp_c = ds_point["t2m"].values - 273.15
     time = pd.to_datetime(ds_point["time"].values)
 
@@ -215,7 +201,7 @@ def classify_risk(temp: float, stage: str, photoperiod: str) -> str:
 
 
 # ---------------------------------------------------------------------
-# 5. Chronomap generation (with stage + month bars)
+# 5. Chronomap generation
 # ---------------------------------------------------------------------
 
 RISK_LEVELS = ["frost", "cold", "cool", "optimal", "warm", "heat"]
@@ -434,17 +420,16 @@ def generate_chronomap(
 # 6. End-to-end pipeline
 # ---------------------------------------------------------------------
 
-def build_chronomap_from_era5(
+def build_chronomap_from_agera5(
     lat: float,
     lon: float,
     year: int,
     planting_date: str,
     harvest_date: str,
     tbase: float = 7.0,
-    nc_path: str = "era5_t2m.nc",
 ) -> plt.Figure:
 
-    df_utc = get_era5_temperature(lat, lon, year, out_nc=nc_path)
+    df_utc = load_agera5_hourly(lat, lon, year)
     df_local = to_local_time(df_utc, lat, lon)
 
     fig = generate_chronomap(
@@ -459,8 +444,8 @@ def build_chronomap_from_era5(
 
 
 if __name__ == "__main__":
-    # Example manual run (not used in GitHub Actions)
-    fig = build_chronomap_from_era5(
+    # Example manual run
+    fig = build_chronomap_from_agera5(
         lat=50.067,
         lon=-112.097,
         year=2024,
@@ -468,4 +453,3 @@ if __name__ == "__main__":
         harvest_date="2024-09-30",
     )
     fig.savefig("chronomap.png", dpi=150)
-
