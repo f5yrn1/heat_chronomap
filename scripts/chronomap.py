@@ -442,6 +442,16 @@ def build_chronomap_from_open_meteo(config: Dict) -> plt.Figure:
     lat = config["latitude"]
     lon = config["longitude"]
     year = config["year"]
+
+    # ---- ADD THIS BLOCK ----
+    if year < 2012:
+        raise ValueError(
+            f"Requested year {year} is too early. "
+            "Open-Meteo hourly ERA5/ERA5-Land only supports years >= 2010, "
+            "and the chronomap requires year-2. Choose year >= 2012."
+        )
+    # -------------------------
+
     planting_date = config["planting_date"]
     harvest_date = config["harvest_date"]
     tbase = config.get("tbase", 7.0)
@@ -460,6 +470,7 @@ def build_chronomap_from_open_meteo(config: Dict) -> plt.Figure:
         title=title,
     )
     return fig
+
 
 
 def main():
