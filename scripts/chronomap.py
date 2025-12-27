@@ -1,24 +1,22 @@
 """
-chronomap.py — AgERA5-H version
+chronomap.py — Open-Meteo ERA5 version
 
-Full Python chronomap engine with:
-- AgERA5-H hourly 2m temperature (public, no credentials)
-- Local time conversion
-- GDD-based phenology (with "tuber initiation")
-- Photoperiod-aware thermal envelopes
-- Sunrise/sunset lines
-- Stage bar + Month bar
-- Hour x DOY climate-risk tiles
-
-Dependencies:
-pip install xarray netCDF4 pandas numpy pytz timezonefinder astral matplotlib
+Workflow:
+- Read config from inputs/latest.json
+- Pull hourly ERA5-based temperature from Open-Meteo (no auth)
+- Convert to local time
+- Compute sunrise/sunset
+- GDD-based phenology + stage windows
+- Photoperiod-aware risk classification
+- Chronomap plot saved to docs/output/chronomap.png
 """
 
+import json
 import os
 from dataclasses import dataclass
-from typing import Dict, Tuple
+from typing import Tuple, Dict
 
-import xarray as xr
+import requests
 import numpy as np
 import pandas as pd
 
@@ -28,37 +26,56 @@ import pytz
 from astral import LocationInfo
 from astral.sun import sun
 
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap, BoundaryNorm
 
 
 # ---------------------------------------------------------------------
-# 1. AgERA5-H hourly temperature loader
+# 1. Config loader
 # ---------------------------------------------------------------------
 
-def load_agera5_hourly(lat: float, lon: float, year: int) -> pd.DataFrame:
-    """
-    Load AgERA5-H hourly 2m temperature for a single point.
-    Public, no credentials required.
-    """
-
-    # Public AgERA5-H bucket (example structure)
-    url = f"https://objectstore.eea.europa.eu/agera5/t2m_hourly/{year}.nc"
-
-    ds = xr.open_dataset(url)
-
-    # Select nearest grid cell
-    ds_point = ds.sel(latitude=lat, longitude=lon, method="nearest")
-
-    # Convert to Celsius
-    temp_c = ds_point["t2m"].values - 273.15
-    time = pd.to_datetime(ds_point["time"].values)
-
-    return pd.DataFrame({"timestamp_utc": time, "temp": temp_c})
+def load_config(path: str = "inputs/latest.json") -> Dict:
+    with open(path, "r") as f:
+        return json.load(f)
 
 
 # ---------------------------------------------------------------------
-# 2. Timezone + local-time conversion
+# 2. Open-Meteo hourly loader (ERA5-based)
+# ---------------------------------------------------------------------
+
+def load_hourly_from_open_meteo(lat: float, lon: float, year: int) -> pd.DataFrame:
+    """
+    Load hourly ERA5-based temperature from Open-Meteo (public, no auth).
+    Returns DataFrame with timestamp_utc and temp (°C).
+    """
+    url = (
+        "https://api.open-meteo.com/v1/era5?"
+        f"latitude={lat}&longitude={lon}"
+        f"&hourly=temperature_2m"
+        f"&start_date={year}-01-01"
+        f"&end_date={year}-12-31"
+        "&timezone=UTC"
+    )
+
+    r = requests.get(url, timeout=60)
+    r.raise_for_status()
+    data = r.json()
+
+    timestamps = data["hourly"]["time"]
+    temps = data["hourly"]["temperature_2m"]
+
+    df = pd.DataFrame({
+        "timestamp_utc": pd.to_datetime(timestamps),
+        "temp": temps
+    })
+
+    return df
+
+
+# ---------------------------------------------------------------------
+# 3. Timezone + local-time conversion
 # ---------------------------------------------------------------------
 
 def get_local_timezone(lat: float, lon: float) -> str:
@@ -82,7 +99,7 @@ def to_local_time(df: pd.DataFrame, lat: float, lon: float) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------
-# 3. GDD-based phenology windows
+# 4. GDD-based phenology windows
 # ---------------------------------------------------------------------
 
 @dataclass
@@ -95,11 +112,14 @@ class StageWindows:
     senescence: Tuple[int, int]
 
 
-def compute_stage_windows(weather: pd.DataFrame, planting_date: pd.Timestamp, tbase: float) -> StageWindows:
+def compute_stage_windows(weather: pd.DataFrame,
+                          planting_date: pd.Timestamp,
+                          tbase: float) -> StageWindows:
     df = weather.copy()
     df = df[df["timestamp"].dt.date >= planting_date.date()].copy()
     df["doy"] = df["timestamp"].dt.dayofyear
 
+    # hourly GDD contribution
     df["gdd"] = np.maximum(0, df["temp"] - tbase) / 24.0
     df["cum_gdd"] = df["gdd"].cumsum()
 
@@ -139,7 +159,7 @@ def assign_stage(doy: int, windows: StageWindows) -> str:
 
 
 # ---------------------------------------------------------------------
-# 4. Photoperiod + envelopes + risk classification
+# 5. Photoperiod + envelopes + risk classification
 # ---------------------------------------------------------------------
 
 THERMAL_ENVELOPES = {
@@ -170,12 +190,20 @@ THERMAL_ENVELOPES = {
 }
 
 
-def compute_sun_times_for_dates(lat: float, lon: float, tz_name: str, dates: pd.DatetimeIndex) -> pd.DataFrame:
+def compute_sun_times_for_dates(lat: float,
+                                lon: float,
+                                tz_name: str,
+                                dates: pd.DatetimeIndex) -> pd.DataFrame:
     location = LocationInfo(latitude=lat, longitude=lon, timezone=tz_name)
+    tz = pytz.timezone(tz_name)
     out = []
     for d in dates:
-        s_times = sun(location.observer, date=d.date(), tzinfo=pytz.timezone(tz_name))
-        out.append({"date": d.date(), "sunrise": s_times["sunrise"], "sunset": s_times["sunset"]})
+        s_times = sun(location.observer, date=d.date(), tzinfo=tz)
+        out.append({
+            "date": d.date(),
+            "sunrise": s_times["sunrise"],
+            "sunset": s_times["sunset"]
+        })
     return pd.DataFrame(out)
 
 
@@ -201,7 +229,7 @@ def classify_risk(temp: float, stage: str, photoperiod: str) -> str:
 
 
 # ---------------------------------------------------------------------
-# 5. Chronomap generation
+# 6. Chronomap generation
 # ---------------------------------------------------------------------
 
 RISK_LEVELS = ["frost", "cold", "cool", "optimal", "warm", "heat"]
@@ -236,7 +264,6 @@ def generate_chronomap(
     df["doy"] = df["timestamp"].dt.dayofyear
     df["hour"] = df["timestamp"].dt.hour
 
-    # Sunrise/sunset
     tz_name = df["tz"].iloc[0]
     unique_dates = pd.to_datetime(sorted(df["date"].unique()))
     sun_df = compute_sun_times_for_dates(lat, lon, tz_name, unique_dates)
@@ -245,7 +272,7 @@ def generate_chronomap(
     df["is_day"] = (df["timestamp"] >= df["sunrise"]) & (df["timestamp"] < df["sunset"])
     df["photoperiod"] = np.where(df["is_day"], "day", "night")
 
-    # Stage windows
+    # Stage windows + stage assignment
     stage_windows = compute_stage_windows(df, planting_date, tbase)
     df["stage"] = df["doy"].apply(lambda d: assign_stage(d, stage_windows))
 
@@ -317,12 +344,9 @@ def generate_chronomap(
         .reset_index()
     )
 
-    # -----------------------------------------------------------------
-    # Plot layout
-    # -----------------------------------------------------------------
+    # Plot
     fig = plt.figure(figsize=(12, 8))
 
-    # Main chronomap axes
     ax = fig.add_axes([0.25, 0.1, 0.70, 0.8])
 
     cmap = ListedColormap([RISK_COLORS[r] for r in RISK_LEVELS])
@@ -338,28 +362,27 @@ def generate_chronomap(
         extent=[-0.5, 23.5, max_doy + 0.5, min_doy - 0.5],
     )
 
-    # Sunrise/sunset lines
     for _, row in sun_daily.iterrows():
         doy = row["doy"]
         if not np.isnan(row["sunrise_hour"]):
-            ax.plot([row["sunrise_hour"], row["sunrise_hour"]], [doy - 0.5, doy + 0.5], color="black", linewidth=1.2)
+            ax.plot([row["sunrise_hour"], row["sunrise_hour"]],
+                    [doy - 0.5, doy + 0.5],
+                    color="black", linewidth=1.2)
         if not np.isnan(row["sunset_hour"]):
-            ax.plot([row["sunset_hour"], row["sunset_hour"]], [doy - 0.5, doy + 0.5], color="black", linewidth=1.2)
+            ax.plot([row["sunset_hour"], row["sunset_hour"]],
+                    [doy - 0.5, doy + 0.5],
+                    color="black", linewidth=1.2)
 
     ax.set_xlabel("Hour of Day")
     ax.set_ylabel("Day of Year")
     ax.set_title(f"{title}\nTimezone: {tz_name}")
 
-    # Legend
     cbar = fig.colorbar(im, ax=ax, ticks=np.arange(len(RISK_LEVELS)))
     cbar.ax.set_yticklabels(RISK_LEVELS)
     cbar.set_label("Thermal Envelope")
 
-    # -----------------------------------------------------------------
     # Stage bar
-    # -----------------------------------------------------------------
     stage_ax = fig.add_axes([0.05, 0.1, 0.07, 0.8])
-
     for _, row in stage_bar.iterrows():
         stage_ax.fill_between(
             x=[0, 1],
@@ -378,17 +401,13 @@ def generate_chronomap(
             rotation=90,
             fontsize=8
         )
-
     stage_ax.set_ylim(ax.get_ylim())
     stage_ax.set_xticks([])
     stage_ax.set_yticks([])
     stage_ax.set_title("Stage", fontsize=9)
 
-    # -----------------------------------------------------------------
     # Month bar
-    # -----------------------------------------------------------------
     month_ax = fig.add_axes([0.14, 0.1, 0.07, 0.8])
-
     for _, row in month_bar.iterrows():
         month_ax.fill_between(
             x=[0, 1],
@@ -406,7 +425,6 @@ def generate_chronomap(
             va="center",
             fontsize=8
         )
-
     month_ax.set_ylim(ax.get_ylim())
     month_ax.set_xticks([])
     month_ax.set_yticks([])
@@ -417,19 +435,19 @@ def generate_chronomap(
 
 
 # ---------------------------------------------------------------------
-# 6. End-to-end pipeline
+# 7. End-to-end pipeline
 # ---------------------------------------------------------------------
 
-def build_chronomap_from_agera5(
-    lat: float,
-    lon: float,
-    year: int,
-    planting_date: str,
-    harvest_date: str,
-    tbase: float = 7.0,
-) -> plt.Figure:
+def build_chronomap_from_open_meteo(config: Dict) -> plt.Figure:
+    lat = config["latitude"]
+    lon = config["longitude"]
+    year = config["year"]
+    planting_date = config["planting_date"]
+    harvest_date = config["harvest_date"]
+    tbase = config.get("tbase", 7.0)
+    title = config.get("title", "Photoperiod-Aware Hourly Climate-Risk Chronomap")
 
-    df_utc = load_agera5_hourly(lat, lon, year)
+    df_utc = load_hourly_from_open_meteo(lat, lon, year)
     df_local = to_local_time(df_utc, lat, lon)
 
     fig = generate_chronomap(
@@ -439,17 +457,20 @@ def build_chronomap_from_agera5(
         planting_date=planting_date,
         harvest_date=harvest_date,
         tbase=tbase,
+        title=title,
     )
     return fig
 
 
+def main():
+    config = load_config("inputs/latest.json")
+    fig = build_chronomap_from_open_meteo(config)
+
+    os.makedirs("docs/output", exist_ok=True)
+    out_path = "docs/output/chronomap.png"
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    print(f"Saved chronomap to {out_path}")
+
+
 if __name__ == "__main__":
-    # Example manual run
-    fig = build_chronomap_from_agera5(
-        lat=50.067,
-        lon=-112.097,
-        year=2024,
-        planting_date="2024-05-20",
-        harvest_date="2024-09-30",
-    )
-    fig.savefig("chronomap.png", dpi=150)
+    main()
