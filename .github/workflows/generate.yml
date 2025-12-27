@@ -57,4 +57,5 @@ jobs:
 
     - name: Push to chronomap-build branch
       run: |
-        git push origin HEAD:chronomap-build
+        git push --force origin HEAD:chronomap-build
+
