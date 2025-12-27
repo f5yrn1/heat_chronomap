@@ -1,28 +1,25 @@
-# Chronomap Generator (ERA5-powered)
+# Heat Chronomap
 
-This repository hosts a fully automated, ERA5-driven chronomap generator.
+Automated, public, hourly climate-risk chronomap built from Open-Meteo ERA5-based data.
 
 ## How it works
 
-- The web UI is hosted on **GitHub Pages** (`/docs/index.html`)
-- Users enter:
-  - Latitude
-  - Longitude
-  - Year
-  - Planting date
-  - Harvest date
-- A **GitHub Action** runs the Python chronomap engine
-- ERA5 data is downloaded via `cdsapi`
-- The chronomap is generated and saved to `/docs/output/chronomap.png`
-- GitHub Pages automatically serves the updated image
+- `inputs/latest.json` defines latitude, longitude, year, planting/harvest, and base temperature.
+- `scripts/chronomap.py`:
+  - fetches hourly temperature from Open-Meteo (no auth, global)
+  - converts to local time and computes sunrise/sunset
+  - computes GDD-based phenology stage windows
+  - classifies hourly thermal risk by stage and photoperiod
+  - generates a chronomap and saves `docs/output/chronomap.png`
+- `.github/workflows/build.yml` runs the pipeline on pushes that affect:
+  - `inputs/latest.json`
+  - `scripts/**`
+  - the workflow itself
+- GitHub Actions commits the updated PNG back to the repo.
+- GitHub Pages serves `docs/index.html`, which displays the latest chronomap.
 
-## Run locally
+## Local run
 
 ```bash
-python scripts/chronomap.py \
-  --lat 50.067 \
-  --lon -112.097 \
-  --year 2024 \
-  --planting 2024-05-20 \
-  --harvest 2024-09-30 \
-  --out chronomap.png
+pip install -r requirements.txt
+python scripts/chronomap.py
