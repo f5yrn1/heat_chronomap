@@ -312,12 +312,17 @@ def generate_chronomap(
     stage_bar = stage_bar.sort_values("stage")
 
     # Month bar
-    month_bar = (
-        df.groupby(df["timestamp"].dt.month)
-          .agg(doy_min=("doy", "min"), doy_max=("doy", "max"))
-          .reset_index()
-    )
-    month_bar["month_label"] = month_bar["timestamp"].dt.month_name().str[:3]
+month_bar = (
+    df.groupby(df["timestamp"].dt.month)
+      .agg(doy_min=("doy", "min"), doy_max=("doy", "max"))
+      .reset_index()
+      .rename(columns={"timestamp": "month"})
+)
+
+month_bar["month_label"] = month_bar["month"].apply(
+    lambda m: pd.Timestamp(2020, m, 1).strftime("%b")
+)
+
 
     # Build risk grid
     min_doy = df["doy"].min()
