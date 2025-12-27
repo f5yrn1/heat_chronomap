@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chronomap Generator</title>
+</head>
+<body>
+  <h1>Chronomap Generator</h1>
+
+  <form action="https://github.com/f5yrn1/chronomap/actions/workflows/generate.yml" method="get">
+    <label>Latitude:</label>
+    <input type="text" name="lat" value="50.067"><br><br>
+
+    <label>Longitude:</label>
+    <input type="text" name="lon" value="-112.097"><br><br>
+
+    <label>Year:</label>
+    <input type="text" name="year" value="2024"><br><br>
+
+    <label>Planting Date:</label>
+    <input type="text" name="planting" value="2024-05-20"><br><br>
+
+    <label>Harvest Date:</label>
+    <input type="text" name="harvest" value="2024-09-30"><br><br>
+
+    <button type="submit">Generate Chronomap</button>
+  </form>
+
+  <h2>Latest Output</h2>
+  <img src="output/chronomap.png" width="800">
+</body>
+</html>
