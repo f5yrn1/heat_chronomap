@@ -1,23 +1,9 @@
 name: Generate Chronomap
 
 on:
-  workflow_dispatch:
-    inputs:
-      lat:
-        description: "Latitude"
-        required: true
-      lon:
-        description: "Longitude"
-        required: true
-      year:
-        description: "Year"
-        required: true
-      planting:
-        description: "Planting date"
-        required: true
-      harvest:
-        description: "Harvest date"
-        required: true
+  push:
+    paths:
+      - "inputs/latest.json"
 
 jobs:
   build:
@@ -25,6 +11,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+
+    - name: Install jq
+      run: sudo apt-get install -y jq
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -35,14 +24,29 @@ jobs:
       run: |
         pip install cdsapi xarray netCDF4 pandas numpy pytz timezonefinder astral matplotlib
 
+    - name: Read inputs
+      id: readjson
+      run: |
+        LAT=$(jq -r '.lat' inputs/latest.json)
+        LON=$(jq -r '.lon' inputs/latest.json)
+        YEAR=$(jq -r '.year' inputs/latest.json)
+        PLANT=$(jq -r '.planting' inputs/latest.json)
+        HARV=$(jq -r '.harvest' inputs/latest.json)
+
+        echo "LAT=$LAT" >> $GITHUB_ENV
+        echo "LON=$LON" >> $GITHUB_ENV
+        echo "YEAR=$YEAR" >> $GITHUB_ENV
+        echo "PLANT=$PLANT" >> $GITHUB_ENV
+        echo "HARV=$HARV" >> $GITHUB_ENV
+
     - name: Run chronomap generator
       run: |
         python scripts/chronomap.py \
-          --lat ${{ github.event.inputs.lat }} \
-          --lon ${{ github.event.inputs.lon }} \
-          --year ${{ github.event.inputs.year }} \
-          --planting ${{ github.event.inputs.planting }} \
-          --harvest ${{ github.event.inputs.harvest }} \
+          --lat $LAT \
+          --lon $LON \
+          --year $YEAR \
+          --planting $PLANT \
+          --harvest $HARV \
           --out docs/output/chronomap.png
 
     - name: Commit results
