@@ -42,25 +42,3 @@ jobs:
           print("\n=== COORDINATES ===")
           print(ds.coords)
           EOF
-
-      # ---------------------------------------------------------
-      # 2. Run chronomap generator
-      # ---------------------------------------------------------
-      - name: Run chronomap generator
-        run: |
-          python scripts/chronomap.py
-
-      # ---------------------------------------------------------
-      # 3. Commit chronomap output
-      # ---------------------------------------------------------
-      - name: Commit chronomap output
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add docs/output/chronomap.png
-          git commit -m "Update chronomap" || echo "No changes to commit"
-
-      - name: Push changes
-        uses: ad-m/github-push-action@v1
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
