@@ -459,8 +459,13 @@ def build_chronomap_from_era5(
 
 
 if __name__ == "__main__":
-    lat = 50.067
-    lon = -112.097
-    year = 2024
-    planting_date = "2024-05-20"
-    harvest_date = "202
+    # Example manual run (not used in GitHub Actions)
+    fig = build_chronomap_from_era5(
+        lat=50.067,
+        lon=-112.097,
+        year=2024,
+        planting_date="2024-05-20",
+        harvest_date="2024-09-30",
+    )
+    fig.savefig("chronomap.png", dpi=150)
+
