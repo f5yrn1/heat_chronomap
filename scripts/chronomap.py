@@ -235,7 +235,7 @@ def classify_risk(temp: float, stage: str, photoperiod: str) -> str:
 
 RISK_LEVELS = ["frost", "cold", "cool", "optimal", "warm", "heat"]
 RISK_COLORS = {
-    "frost": "purple4",
+    "frost": "#2E0854",
     "cold": "steelblue",
     "cool": "lightblue",
     "optimal": "green",
