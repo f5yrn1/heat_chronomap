@@ -2,6 +2,8 @@ name: Generate Chronomap
 
 on:
   push:
+    branches:
+      - main
     paths:
       - "inputs/latest.json"
 
@@ -30,7 +32,6 @@ jobs:
         pip install cdsapi xarray netCDF4 pandas numpy pytz timezonefinder astral matplotlib
 
     - name: Read inputs
-      id: readjson
       run: |
         LAT=$(jq -r '.latitude' inputs/latest.json)
         LON=$(jq -r '.longitude' inputs/latest.json)
@@ -45,23 +46,15 @@ jobs:
         echo "HARV=$HARV" >> $GITHUB_ENV
 
     - name: Run chronomap generator
-      run: |
-        python scripts/chronomap.py
+      run: python scripts/chronomap.py
 
-    # Commit PNG BEFORE pulling
-    - name: Commit results locally
+    - name: Commit results
       run: |
         git config user.name "github-actions"
         git config user.email "actions@github.com"
         git add docs/output/chronomap.png
         git commit -m "Updated chronomap" || echo "No changes"
 
-    # Pull Worker commit and merge
-    - name: Pull latest changes
+    - name: Push to chronomap-build branch
       run: |
-        git pull --no-edit origin main || echo "Merge completed"
-
-    # Push using git directly (NOT the push action)
-    - name: Push changes
-      run: |
-        git push origin main
+        git push origin HEAD:chronomap-build
