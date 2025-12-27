@@ -9,7 +9,8 @@
 <h1>Chronomap Generator</h1>
 
 <p>Enter your parameters and click Generate.  
-This updates <code>inputs/latest.json</code> in the repository, which triggers the GitHub Action.</p>
+This sends your inputs to a secure Cloudflare Worker, which updates
+<code>inputs/latest.json</code> in the repository and triggers the GitHub Action.</p>
 
 <label>Latitude:</label>
 <input id="lat" type="text" value="50.067"><br><br>
@@ -29,6 +30,8 @@ This updates <code>inputs/latest.json</code> in the repository, which triggers t
 <button onclick="generate()">Generate Chronomap</button>
 
 <h2>Latest Output</h2>
+<p>The most recently generated chronomap will appear below:</p>
+
 <img src="output/chronomap.png" width="900">
 
 <script>
@@ -41,26 +44,26 @@ async function generate() {
     harvest: document.getElementById("harvest").value
   };
 
-  const json = JSON.stringify(data, null, 2);
+  try {
+    const resp = await fetch(
+      "https://cold-pond-6408.jonathanarthurdonaldneilson.workers.dev/",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data)
+      }
+    );
 
-  const url = "https://api.github.com/repos/f5yrn1/heat_chronomap/contents/inputs/latest.json";
+    if (!resp.ok) {
+      const text = await resp.text();
+      alert("Worker error: " + text);
+      return;
+    }
 
-  const getResp = await fetch(url);
-  const file = await getResp.json();
-
-  const payload = {
-    message: "Update inputs/latest.json",
-    content: btoa(json),
-    sha: file.sha
-  };
-
-  await fetch(url, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-
-  alert("Inputs updated. GitHub Action will run shortly.");
+    alert("Inputs updated. GitHub Action will run shortly.");
+  } catch (err) {
+    alert("Network error: " + err);
+  }
 }
 </script>
 
