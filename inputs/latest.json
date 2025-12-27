@@ -1,7 +1,9 @@
 {
-  "lat": 50.067,
-  "lon": -112.097,
+  "latitude": 50.067,
+  "longitude": -112.097,
   "year": 2024,
-  "planting": "2024-05-20",
-  "harvest": "2024-09-30"
+  "planting_date": "2024-05-20",
+  "harvest_date": "2024-09-30",
+  "tbase": 7.0,
+  "title": "Photoperiod-Aware Hourly Climate-Risk Chronomap"
 }
