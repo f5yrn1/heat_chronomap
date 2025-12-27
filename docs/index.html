@@ -9,7 +9,7 @@
 <h1>Chronomap Generator</h1>
 
 <p>Enter your parameters and click Generate.  
-This will update <code>inputs/latest.json</code> in the repository, which triggers the GitHub Action.</p>
+This updates <code>inputs/latest.json</code> in the repository, which triggers the GitHub Action.</p>
 
 <label>Latitude:</label>
 <input id="lat" type="text" value="50.067"><br><br>
@@ -43,11 +43,7 @@ async function generate() {
 
   const json = JSON.stringify(data, null, 2);
 
-  // GitHub API endpoint for committing a file
-  const url = "https://api.github.com/repos/f5yrn1/heat_chronomap/inputs/latest.json";
-
-  // IMPORTANT: This uses GitHub's "unauthenticated commit" feature via the web UI.
-  // GitHub will prompt the user to authenticate in the browser.
+  const url = "https://api.github.com/repos/f5yrn1/heat_chronomap/contents/inputs/latest.json";
 
   const getResp = await fetch(url);
   const file = await getResp.json();
