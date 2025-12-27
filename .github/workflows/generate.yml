@@ -48,9 +48,7 @@ jobs:
       run: |
         python scripts/chronomap.py
 
-    # -------------------------------
-    # FIX: Commit BEFORE pulling
-    # -------------------------------
+    # Commit PNG BEFORE pulling
     - name: Commit results locally
       run: |
         git config user.name "github-actions"
@@ -58,15 +56,12 @@ jobs:
         git add docs/output/chronomap.png
         git commit -m "Updated chronomap" || echo "No changes"
 
-    # -------------------------------
-    # FIX: Pull AFTER committing
-    # -------------------------------
-    - name: Pull latest changes (merge Worker commit)
+    # Pull Worker commit and merge
+    - name: Pull latest changes
       run: |
         git pull --no-edit origin main || echo "Merge completed"
 
+    # Push using git directly (NOT the push action)
     - name: Push changes
-      uses: ad-m/github-push-action@v1
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        branch: main
+      run: |
+        git push origin main
