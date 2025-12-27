@@ -2,16 +2,138 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Heat Chronomap</title>
+  <title>Heat Chronomap Generator</title>
   <style>
-    body { font-family: sans-serif; margin: 2rem; }
-    img { max-width: 100%; height: auto; border: 1px solid #ccc; }
+    body {
+      font-family: sans-serif;
+      margin: 2rem;
+      max-width: 900px;
+    }
+    label {
+      display: block;
+      margin-top: 1rem;
+      font-weight: bold;
+    }
+    input {
+      width: 250px;
+      padding: 6px;
+      margin-top: 4px;
+    }
+    button {
+      margin-top: 1.5rem;
+      padding: 10px 20px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    #status {
+      margin-top: 1rem;
+      font-style: italic;
+      color: #444;
+    }
+    img {
+      margin-top: 2rem;
+      max-width: 100%;
+      border: 1px solid #ccc;
+    }
   </style>
 </head>
 <body>
-  <h1>Heat Chronomap</h1>
-  <p>The latest chronomap generated from Open-Meteo ERA5-based hourly data:</p>
-  <img src="output/chronomap.png" alt="Chronomap">
-  <p><em>If the image looks stale, try refreshing the page (Ctrl+F5).</em></p>
+
+  <h1>Heat Chronomap Generator</h1>
+
+  <p>Enter your parameters below and click <strong>Generate Chronomap</strong>.  
+     Your request will be sent to the Cloudflare Worker, which updates <code>inputs/latest.json</code>.  
+     GitHub Actions will then rebuild the chronomap automatically.</p>
+
+  <form id="chronomapForm">
+    <label>Latitude
+      <input type="number" step="0.0001" id="lat" required>
+    </label>
+
+    <label>Longitude
+      <input type="number" step="0.0001" id="lon" required>
+    </label>
+
+    <label>Year
+      <input type="number" id="year" value="2024" required>
+    </label>
+
+    <label>Planting Date
+      <input type="date" id="planting" required>
+    </label>
+
+    <label>Harvest Date
+      <input type="date" id="harvest" required>
+    </label>
+
+    <label>Base Temperature (tbase)
+      <input type="number" step="0.1" id="tbase" value="7.0" required>
+    </label>
+
+    <button type="submit">Generate Chronomap</button>
+  </form>
+
+  <div id="status"></div>
+
+  <h2>Latest Chronomap</h2>
+  <img id="chronomapImg" src="output/chronomap.png" alt="Chronomap">
+
+  <script>
+    const workerURL = "YOUR_WORKER_URL_HERE"; // <-- replace with your Worker endpoint
+
+    document.getElementById("chronomapForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const payload = {
+        latitude: parseFloat(document.getElementById("lat").value),
+        longitude: parseFloat(document.getElementById("lon").value),
+        year: parseInt(document.getElementById("year").value),
+        planting_date: document.getElementById("planting").value,
+        harvest_date: document.getElementById("harvest").value,
+        tbase: parseFloat(document.getElementById("tbase").value)
+      };
+
+      document.getElementById("status").textContent =
+        "Sending request to Worker…";
+
+      try {
+        const res = await fetch(workerURL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          document.getElementById("status").textContent =
+            "Worker returned an error.";
+          return;
+        }
+
+        document.getElementById("status").textContent =
+          "Worker updated latest.json. GitHub Actions is now rebuilding the chronomap…";
+
+        // Auto-refresh the PNG every 10 seconds for 2 minutes
+        let attempts = 0;
+        const maxAttempts = 12;
+
+        const interval = setInterval(() => {
+          attempts++;
+          const img = document.getElementById("chronomapImg");
+          img.src = "output/chronomap.png?cache=" + Date.now();
+
+          if (attempts >= maxAttempts) {
+            clearInterval(interval);
+            document.getElementById("status").textContent =
+              "If the image hasn't updated yet, refresh the page.";
+          }
+        }, 10000);
+
+      } catch (err) {
+        document.getElementById("status").textContent =
+          "Error contacting Worker.";
+      }
+    });
+  </script>
+
 </body>
 </html>
