@@ -47,11 +47,11 @@ def load_config(path: str = "inputs/latest.json") -> Dict:
 
 def load_hourly_from_open_meteo(lat: float, lon: float, year: int) -> pd.DataFrame:
     """
-    Load hourly ERA5-based temperature from Open-Meteo (public, no auth).
-    Returns DataFrame with timestamp_utc and temp (°C).
+    Load hourly temperature from Open-Meteo Archive API (near-real-time).
+    Replaces ERA5/ERA5-Land.
     """
     url = (
-        "https://api.open-meteo.com/v1/era5-land?"
+        "https://archive-api.open-meteo.com/v1/archive?"
         f"latitude={lat}&longitude={lon}"
         f"&hourly=temperature_2m"
         f"&start_date={year}-01-01"
@@ -72,6 +72,7 @@ def load_hourly_from_open_meteo(lat: float, lon: float, year: int) -> pd.DataFra
     })
 
     return df
+
 
 
 # ---------------------------------------------------------------------
