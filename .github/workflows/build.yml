@@ -25,10 +25,34 @@ jobs:
           python -m pip install --upgrade pip
           pip install xarray netCDF4 pandas numpy pytz timezonefinder astral matplotlib
 
+      # ---------------------------------------------------------
+      # 1. Inspect AgERA5 daily dataset metadata
+      # ---------------------------------------------------------
+      - name: Inspect AgERA5 daily metadata
+        run: |
+          python - <<EOF
+          import xarray as xr
+          url = "https://objectstore.eea.europa.eu/agera5/t2m_daily/2024.nc"
+          print("Opening dataset:", url)
+          ds = xr.open_dataset(url)
+          print("\n=== DATASET SUMMARY ===")
+          print(ds)
+          print("\n=== VARIABLE NAMES ===")
+          print(list(ds.variables.keys()))
+          print("\n=== COORDINATES ===")
+          print(ds.coords)
+          EOF
+
+      # ---------------------------------------------------------
+      # 2. Run chronomap generator
+      # ---------------------------------------------------------
       - name: Run chronomap generator
         run: |
           python scripts/chronomap.py
 
+      # ---------------------------------------------------------
+      # 3. Commit chronomap output
+      # ---------------------------------------------------------
       - name: Commit chronomap output
         run: |
           git config user.name "github-actions"
