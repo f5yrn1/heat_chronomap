@@ -44,7 +44,7 @@ async function generate() {
   const json = JSON.stringify(data, null, 2);
 
   // GitHub API endpoint for committing a file
-  const url = "https://api.github.com/repos/f5yrn1/heat_chronomap/contents/inputs/latest.json";
+  const url = "https://api.github.com/repos/f5yrn1/heat_chronomap/tree/main/inputs/latest.json";
 
   // IMPORTANT: This uses GitHub's "unauthenticated commit" feature via the web UI.
   // GitHub will prompt the user to authenticate in the browser.
