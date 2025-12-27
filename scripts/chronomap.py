@@ -51,7 +51,7 @@ def load_hourly_from_open_meteo(lat: float, lon: float, year: int) -> pd.DataFra
     Returns DataFrame with timestamp_utc and temp (°C).
     """
     url = (
-        "https://api.open-meteo.com/v1/era5?"
+        "https://api.open-meteo.com/v1/era5-land?"
         f"latitude={lat}&longitude={lon}"
         f"&hourly=temperature_2m"
         f"&start_date={year}-01-01"
